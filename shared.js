@@ -11,7 +11,7 @@
   const MASTER_SCRIPT_URL_KEY = "bliss-taskpro-master-script-url";
   const ENGINEER_SCRIPT_URL_KEY = "bliss-taskpro-engineer-script-url";
   const HOSTINGER_UPLOAD_URL = "./upload.php";
-  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw7_qISib94zR0xaleVDpdoQnyxSTU8DzKJH8Fibw/exec";
+  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSYkHlxWKM5zrCIei_Wh9zAiDiAh5zq2AG_oBftNBr2VCCrHmb-pxpE5ka2mitSh9_/exec";
   const DEFAULT_LOGIN_API = {
     master: GOOGLE_SCRIPT_URL,
     engineer: GOOGLE_SCRIPT_URL
