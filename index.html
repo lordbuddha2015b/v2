@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bliss TaskPro | Master App</title>
+  <link rel="icon" type="image/png" href="./New Logo.png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="./styles.css?v=20260407-loginfix">
+</head>
+<body data-app="master">
+  <div class="page-watermark" aria-hidden="true"></div>
+
+  <div class="engineer-login-shell" id="master-login-screen">
+    <div class="login-card">
+      <img class="brand-logo login-logo" src="./New Logo.png" alt="Bliss TaskPro logo">
+      <h1 class="brand-title">Bliss TaskPro</h1>
+      <form id="master-login-form" class="form-grid single-column">
+        <label><span>Master User ID</span><input id="master-login-user" type="text" required></label>
+        <label><span>Password</span><input id="master-login-password" type="password" required></label>
+        <div id="master-login-debug" class="login-debug hidden"></div>
+        <button type="submit" class="primary-button">Login To Master App</button>
+        <button id="master-login-settings" type="button" class="secondary-button">Settings</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="app-shell hidden" id="master-app-shell">
+    <aside class="sidebar">
+      <div class="topbar-stack">
+        <div class="brand-lockup compact-brand">
+          <img class="brand-logo topbar-logo" src="./New Logo.png" alt="Bliss TaskPro logo">
+          <div class="brand-copy">
+            <h1 class="brand-title compact-title">Bliss TaskPro</h1>
+          </div>
+        </div>
+        <div class="topbar-row">
+          <nav class="sidebar-nav compact-nav">
+            <button class="nav-chip active" data-page-target="master-page">Master</button>
+            <button class="nav-chip" data-page-target="task-page">Task</button>
+            <button class="nav-chip" data-page-target="details-page">Task Details</button>
+          </nav>
+          <div class="header-actions">
+            <div class="credential-panel">
+              <p class="eyebrow credential-label">Master Login</p>
+              <p class="credential-text" id="master-user-eyebrow">Master Workspace</p>
+            </div>
+            <div class="action-row compact-actions">
+              <button id="master-sync-button" class="secondary-button" type="button">Sync</button>
+              <button id="master-logout" class="secondary-button" type="button">Logout</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <section id="master-page" class="page-section active">
+        <div class="section-header"><h3>Master</h3></div>
+        <section class="stats-strip">
+          <div class="stat-card"><span>Total Tasks</span><strong id="master-total-tasks">0</strong></div>
+          <div class="stat-card"><span>Completed</span><strong id="master-completed-tasks">0</strong></div>
+          <div class="stat-card"><span>WIP</span><strong id="master-wip-tasks">0</strong></div>
+          <div class="stat-card"><span>Pending</span><strong id="master-pending-tasks">0</strong></div>
+        </section>
+        <div class="grid-layout two-column">
+          <article class="panel">
+            <form id="master-filter-form" class="form-grid compact-form">
+              <label><span>Client</span><select id="clientMaster" name="client" required></select></label>
+              <label id="clientMasterOtherWrap" class="hidden"><span>Other Client</span><input id="clientMasterOther" name="clientOther" type="text"></label>
+              <label><span>Engineer</span><select id="engineerMaster" name="engineer" required></select></label>
+              <label id="engineerMasterOtherWrap" class="hidden"><span>Add New Engineer</span><input id="engineerMasterOther" name="engineerOther" type="text" placeholder="Enter engineer name"></label>
+              <label><span>Category</span><select id="categoryMaster" name="category" required></select></label>
+              <label id="categoryMasterOtherWrap" class="hidden"><span>Other Category</span><input id="categoryMasterOther" name="categoryOther" type="text"></label>
+              <label><span>Activity</span><select id="activityMaster" name="activity" required></select></label>
+              <label id="activityMasterOtherWrap" class="hidden"><span>Other Activity</span><input id="activityMasterOther" name="activityOther" type="text"></label>
+              <div class="form-actions full-span"><button type="submit" class="primary-button">Save Draft For Assignment</button></div>
+            </form>
+          </article>
+          <article class="panel"><div id="draft-list" class="stack-list"></div></article>
+        </div>
+      </section>
+
+      <section id="task-page" class="page-section task-page">
+        <div class="section-header"><h3>Task</h3></div>
+        <div class="grid-layout two-column">
+          <article class="panel">
+            <form id="task-assignment-form" class="form-grid">
+              <label class="full-span"><span>Saved Draft</span><select id="draftSelector" name="draftId" required></select></label>
+              <div id="assignment-empty-state" class="empty-state"></div>
+              <div id="assignment-fields" class="form-grid full-span hidden">
+                <div class="full-span frozen-block">
+                  <div id="frozen-summary" class="chip-row"></div>
+                </div>
+                <label><span>Site ID</span><input type="text" id="assignSiteId" name="siteId" required></label>
+                <label><span>Date</span><input type="date" id="assignDate" name="date" required></label>
+                <label class="full-span"><span>Location</span><input type="text" id="assignLocation" name="location" required></label>
+                <label><span>Latitude</span><input type="number" step="any" id="assignLatitude" name="latitude"></label>
+                <label><span>Longitude</span><input type="number" step="any" id="assignLongitude" name="longitude"></label>
+                <div class="map-actions full-span">
+                  <button type="button" id="capture-master-location" class="secondary-button">Use Current Location</button>
+                  <button type="button" id="pick-master-location" class="secondary-button">Select On Map</button>
+                </div>
+                <label><span>District</span><select id="assignDistrict" name="district" required></select></label>
+                <label class="full-span"><span>Instructions</span><textarea id="assignInstructions" name="instructions" rows="4"></textarea></label>
+                <div class="form-actions full-span"><button type="submit" class="primary-button">Assign Task</button></div>
+              </div>
+            </form>
+          </article>
+          <article class="panel">
+            <div class="responsive-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Serial No</th><th>Site ID</th><th>Engineer</th><th>District</th><th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="queue-list"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="details-page" class="page-section">
+        <div class="section-header"><h3>Task Details</h3></div>
+        <article class="panel">
+          <div class="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Serial Number</th><th>Site ID</th><th>Engineer</th><th>Site Engineer</th><th>District</th><th>Docs</th><th>Photos</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="master-task-table"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+      <footer class="app-footer"><img class="footer-logo" src="./New Logo.png" alt="Bliss TaskPro logo"></footer>
+    </main>
+  </div>
+
+  <div id="map-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header"><h4>Select Location</h4><button type="button" id="close-map-modal" class="secondary-button">Close</button></div>
+      <div id="map-picker" class="map-surface"></div>
+      <div class="modal-footer"><div id="map-selected-output" class="fine-print">Tap on map to choose latitude and longitude.</div><button type="button" id="save-map-point" class="primary-button">Save Selected Location</button></div>
+    </div>
+  </div>
+
+  <div id="settings-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header"><h4>Master Settings</h4><button type="button" id="close-settings-modal" class="secondary-button">Close</button></div>
+      <div class="form-grid">
+        <div class="full-span fine-print">Apps Script URL is now fetched automatically after successful login.</div>
+        <div class="full-span action-row">
+          <button id="master-clear-cache" class="secondary-button" type="button">Clear Cache</button>
+        </div>
+      </div>
+      <div class="modal-footer"><div class="fine-print">These settings are for the Master app only.</div><button id="save-google-settings" class="primary-button" type="button">Done</button></div>
+    </div>
+  </div>
+
+  <div id="task-detail-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card modal-card-lg">
+      <div class="modal-header"><h4>Task Details</h4><button type="button" id="close-task-detail-modal" class="secondary-button">Close</button></div>
+      <div id="task-detail-modal-content" class="detail-panel"></div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="./shared.js?v=20260407-loginfix"></script>
+  <script src="./master.js?v=20260407-loginfix"></script>
+</body>
+</html>
