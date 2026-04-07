@@ -190,8 +190,32 @@
   async function requestGoogleAppsScript(scriptUrl, payload) {
     const response = await fetch(scriptUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
+    });
+    const raw = await response.text();
+    let data = null;
+    try {
+      data = JSON.parse(raw);
+    } catch (error) {
+      throw new Error("Google Apps Script returned non-JSON response.");
+    }
+    if (!response.ok) {
+      throw new Error(data?.message || data?.error || "Google Apps Script request failed.");
+    }
+    return data;
+  }
+
+  async function requestGoogleAppsScriptGet(scriptUrl, query = {}) {
+    const url = new URL(scriptUrl);
+    Object.entries(query).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      url.searchParams.set(key, String(value));
+    });
+    const response = await fetch(url.toString(), {
+      headers: {
+        Accept: "application/json"
+      }
     });
     const raw = await response.text();
     let data = null;
@@ -462,7 +486,7 @@
     const endpoint = resolveGoogleScriptUrl(settings, session?.role || "");
     if (!endpoint || !siteId) return null;
     try {
-      return await requestGoogleAppsScript(endpoint, {
+      return await requestGoogleAppsScriptGet(endpoint, {
         action: "getTask",
         siteId,
         source: session?.role || "",
@@ -478,7 +502,7 @@
     const endpoint = resolveGoogleScriptUrl(settings, session?.role || "");
     if (!endpoint) return null;
     try {
-      return await requestGoogleAppsScript(endpoint, {
+      return await requestGoogleAppsScriptGet(endpoint, {
         action: "getState",
         source: session?.role || "",
         userId: session?.userId || "",
@@ -520,9 +544,7 @@
     const endpoint = resolveGoogleScriptUrl(settings, document.body?.dataset?.app === "engineer" ? "engineer" : "master");
     if (!endpoint) return null;
     try {
-      const data = await requestGoogleAppsScript(endpoint, {
-        action: "getConfig"
-      });
+      const data = await requestGoogleAppsScriptGet(endpoint, {});
       if (!data?.ok) return null;
       return {
         googleScriptUrl: sanitizeGoogleValue(data.scriptURL) || endpoint,
@@ -590,7 +612,7 @@
     const endpoint = resolveGoogleScriptUrl(settings, session?.role || "");
     if (!endpoint || !session?.userId || !session?.sessionToken) return { ok: false, sessionExpired: true };
     try {
-      return await requestGoogleAppsScript(endpoint, {
+      return await requestGoogleAppsScriptGet(endpoint, {
         action: "validateSession",
         role: session.role || "",
         userId: session.userId || "",
