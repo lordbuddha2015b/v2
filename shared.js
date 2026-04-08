@@ -11,7 +11,7 @@
   const MASTER_SCRIPT_URL_KEY = "bliss-taskpro-master-script-url";
   const ENGINEER_SCRIPT_URL_KEY = "bliss-taskpro-engineer-script-url";
   const HOSTINGER_UPLOAD_URL = "./upload.php";
-  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyBlWxrLp9q-Nnhv-mhPcLlXhZqvZnPu2dENh1N2uF7a6IDFDxCFmfuPDi2eIRcuHiv/exec";
+  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSYkHlxWKM5zrCIei_Wh9zAiDiAh5zq2AG_oBftNBr2VCCrHmb-pxpE5ka2mitSh9_/exec";
   const DEFAULT_LOGIN_API = {
     master: GOOGLE_SCRIPT_URL,
     engineer: GOOGLE_SCRIPT_URL
@@ -198,7 +198,8 @@
     try {
       data = JSON.parse(raw);
     } catch (error) {
-      throw new Error("Google Apps Script returned non-JSON response.");
+      const preview = String(raw || "").slice(0, 120).replace(/\s+/g, " ").trim();
+      throw new Error(preview ? `Google Apps Script returned non-JSON response: ${preview}` : "Google Apps Script returned non-JSON response.");
     }
     if (!response.ok) {
       throw new Error(data?.message || data?.error || "Google Apps Script request failed.");
@@ -222,7 +223,8 @@
     try {
       data = JSON.parse(raw);
     } catch (error) {
-      throw new Error("Google Apps Script returned non-JSON response.");
+      const preview = String(raw || "").slice(0, 120).replace(/\s+/g, " ").trim();
+      throw new Error(preview ? `Google Apps Script returned non-JSON response: ${preview}` : "Google Apps Script returned non-JSON response.");
     }
     if (!response.ok) {
       throw new Error(data?.message || data?.error || "Google Apps Script request failed.");
