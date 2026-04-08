@@ -1,0 +1,15 @@
+{
+  "options": {
+    "clients": ["JIO","Retail","Others"],
+    "engineers": ["Naveen","Rocky","Sriram"],
+    "categories": ["Project","O&M","Others"],
+    "activities": ["Enod B","5G","Upgradation","Repair","Others"],
+    "districts": []
+  },
+  "settings": {
+    "master": { "googleScriptUrl": "", "autoSyncEnabled": false },
+    "engineer": { "googleScriptUrl": "", "autoSyncEnabled": false }
+  },
+  "drafts": [],
+  "tasks": []
+}

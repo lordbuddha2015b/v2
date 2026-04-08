@@ -10,8 +10,8 @@
   const SHARED_DISPLAY_NAME_KEY = "displayName";
   const MASTER_SCRIPT_URL_KEY = "bliss-taskpro-master-script-url";
   const ENGINEER_SCRIPT_URL_KEY = "bliss-taskpro-engineer-script-url";
-  const HOSTINGER_UPLOAD_URL = "./upload.php";
-  const HOSTINGER_STORAGE_URL = "./storage.php";
+  const HOSTINGER_UPLOAD_URL = "upload.php";
+  const HOSTINGER_STORAGE_URL = "storage.php";
   const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSYkHlxWKM5zrCIei_Wh9zAiDiAh5zq2AG_oBftNBr2VCCrHmb-pxpE5ka2mitSh9_/exec";
   const DEFAULT_LOGIN_API = {
     master: GOOGLE_SCRIPT_URL,
@@ -441,7 +441,7 @@
 
   async function fetchHostingerState() {
     const data = await requestHostingerStorageGet({ action: "getState" });
-    if (!data?.ok) {
+    if (data?.ok === false) {
       throw new Error(data?.message || data?.error || "Hostinger fetch failed");
     }
     return data.state || data;

@@ -20,6 +20,39 @@ $defaultState = [
 $siteMasterHeaders = ['Site ID', 'Client', 'Engineer', 'Category', 'Activity', 'Date', 'Location', 'District', 'Instructions', 'Created Date'];
 $siteEngineerHeaders = ['Site Engineer Name', 'Status', 'Documents JSON', 'Photos JSON', 'Measurement Text', 'Measurement Images JSON', 'Latitude', 'Longitude', 'Completed Date', 'Rollback Reason'];
 
+function ensure_json_file(): string
+{
+    $dir = __DIR__ . DIRECTORY_SEPARATOR . 'json';
+
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+
+    $file = $dir . DIRECTORY_SEPARATOR . 'hostinger_state.json';
+
+    if (!file_exists($file)) {
+        $defaultData = [
+            'options' => [
+                'clients' => ['JIO', 'Retail', 'Others'],
+                'engineers' => ['Naveen', 'Rocky', 'Sriram'],
+                'categories' => ['Project', 'O&M', 'Others'],
+                'activities' => ['Enod B', '5G', 'Upgradation', 'Repair', 'Others'],
+                'districts' => []
+            ],
+            'settings' => [
+                'master' => ['googleScriptUrl' => '', 'autoSyncEnabled' => false],
+                'engineer' => ['googleScriptUrl' => '', 'autoSyncEnabled' => false]
+            ],
+            'drafts' => [],
+            'tasks' => []
+        ];
+
+        file_put_contents($file, json_encode($defaultData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    }
+
+    return $file;
+}
+
 try {
     $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
     $input = $method === 'POST' ? read_post_payload() : $_GET;
@@ -30,9 +63,20 @@ try {
             json_response(get_task_snapshot($input, $siteMasterHeaders, $siteEngineerHeaders));
         }
         if ($action === 'getState' || $action === '') {
-            json_response(get_latest_app_state($defaultState));
+            $jsonFile = ensure_json_file();
+            echo file_get_contents($jsonFile);
+            exit;
         }
         json_response(['ok' => false, 'status' => 'error', 'message' => 'Unsupported action.'], 400);
+    }
+
+    if ($action === 'syncState') {
+        $jsonFile = ensure_json_file();
+        $state = normalize_state($input['state'] ?? [], $defaultState);
+        file_put_contents($jsonFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        persist_state($state, $defaultState, $siteMasterHeaders, $siteEngineerHeaders);
+        echo json_encode(['status' => 'success'], JSON_UNESCAPED_SLASHES);
+        exit;
     }
 
     if ($action === 'savePdfToDrive') {
@@ -102,7 +146,7 @@ function json_root(): string
 
 function state_file_path(): string
 {
-    return json_root() . DIRECTORY_SEPARATOR . 'hostinger_state.json';
+    return ensure_json_file();
 }
 
 function ensure_dir(string $path): void
