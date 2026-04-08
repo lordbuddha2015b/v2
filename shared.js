@@ -208,31 +208,6 @@
     return data;
   }
 
-  async function requestGoogleAppsScriptGet(scriptUrl, query = {}) {
-    const url = new URL(scriptUrl);
-    Object.entries(query).forEach(([key, value]) => {
-      if (value === undefined || value === null || value === "") return;
-      url.searchParams.set(key, String(value));
-    });
-    const response = await fetch(url.toString(), {
-      headers: {
-        Accept: "application/json"
-      }
-    });
-    const raw = await response.text();
-    let data = null;
-    try {
-      data = JSON.parse(raw);
-    } catch (error) {
-      const preview = String(raw || "").slice(0, 120).replace(/\s+/g, " ").trim();
-      throw new Error(preview ? `Google Apps Script returned non-JSON response: ${preview}` : "Google Apps Script returned non-JSON response.");
-    }
-    if (!response.ok) {
-      throw new Error(data?.message || data?.error || "Google Apps Script request failed.");
-    }
-    return data;
-  }
-
   function clearSharedLoginContext(role) {
     if (!role || localStorage.getItem(SHARED_ROLE_KEY) === role) {
       localStorage.removeItem(SHARED_SCRIPT_URL_KEY);
@@ -464,16 +439,23 @@
     return data;
   }
 
-  async function postGoogleSync(state, payload) {
-    try {
-      const data = await requestHostingerStorage({
-        ...payload,
-        state: sanitizeStateForStorage(state)
-      });
-      return data?.ok === false ? { skipped: false, error: new Error(data.message || data.error || "Sync failed"), sessionExpired: !!data.sessionExpired } : { skipped: false, data };
-    } catch (error) {
-      return { skipped: false, error };
+  async function fetchHostingerState() {
+    const data = await requestHostingerStorageGet({ action: "getState" });
+    if (!data?.ok) {
+      throw new Error(data?.message || data?.error || "Hostinger fetch failed");
     }
+    return data.state || data;
+  }
+
+  async function saveHostingerState(state) {
+    const data = await requestHostingerStorage({
+      action: "syncState",
+      state: sanitizeStateForStorage(state)
+    });
+    if (data?.ok === false) {
+      throw new Error(data.message || data.error || "Hostinger save failed");
+    }
+    return data;
   }
 
   function delay(ms) {
@@ -524,34 +506,6 @@
     }
   }
 
-  async function fetchGoogleTask(settings, siteId, session) {
-    if (!siteId) return null;
-    try {
-      return await requestHostingerStorageGet({
-        action: "getTask",
-        siteId,
-        source: session?.role || "",
-        userId: session?.userId || "",
-        sessionToken: session?.sessionToken || ""
-      });
-    } catch (error) {
-      return null;
-    }
-  }
-
-  async function fetchGoogleState(settings, session) {
-    try {
-      return await requestHostingerStorageGet({
-        action: "getState",
-        source: session?.role || "",
-        userId: session?.userId || "",
-        sessionToken: session?.sessionToken || ""
-      });
-    } catch (error) {
-      return null;
-    }
-  }
-
   async function loginWithGoogle(settings, role, userId, password) {
     const endpoint = sanitizeGoogleValue(DEFAULT_LOGIN_API[role] || DEFAULT_LOGIN_API.master);
     if (!endpoint) {
@@ -576,21 +530,6 @@
       };
     } catch (error) {
       return { ok: false, message: `Unable to verify login. ${error.message || ""}`.trim() };
-    }
-  }
-
-  async function fetchGoogleConfig(settings) {
-    const endpoint = resolveGoogleScriptUrl(settings, document.body?.dataset?.app === "engineer" ? "engineer" : "master");
-    if (!endpoint) return null;
-    try {
-      const data = await requestGoogleAppsScriptGet(endpoint, {});
-      if (!data?.ok) return null;
-      return {
-        googleScriptUrl: sanitizeGoogleValue(data.scriptURL) || endpoint,
-        siteRootFolderId: sanitizeGoogleValue(data.siteRootFolderId)
-      };
-    } catch (error) {
-      return null;
     }
   }
 
@@ -644,21 +583,6 @@
       return address.state_district || address.county || address.city_district || "";
     } catch (error) {
       return "";
-    }
-  }
-
-  async function validateGoogleSession(settings, session) {
-    const endpoint = resolveGoogleScriptUrl(settings, session?.role || "");
-    if (!endpoint || !session?.userId || !session?.sessionToken) return { ok: false, sessionExpired: true };
-    try {
-      return await requestGoogleAppsScriptGet(endpoint, {
-        action: "validateSession",
-        role: session.role || "",
-        userId: session.userId || "",
-        sessionToken: session.sessionToken || ""
-      });
-    } catch (error) {
-      return { ok: false, message: "Unable to validate session." };
     }
   }
 
@@ -762,18 +686,15 @@
     countByStatus,
     escapeHtml,
     loadDistricts,
-    postGoogleSync,
+    fetchHostingerState,
+    saveHostingerState,
     delay,
     savePdfToDrive,
     deleteDriveFile,
     saveReportFiles,
-    fetchGoogleTask,
-    fetchGoogleState,
     reverseGeocodeDistrict,
     loginWithGoogle,
-    fetchGoogleConfig,
     formatLoginFailure,
-    validateGoogleSession,
     mergeGoogleSettings,
     mergeRemoteOptions,
     resolveGoogleScriptUrl,

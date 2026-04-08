@@ -306,12 +306,15 @@
     const uploadState = getUploadState(task.id);
     if (!uploadState.busy && !skipRemote) {
       host.innerHTML = app.emptyMarkup("Loading Site ID details...");
-      const remoteTask = await app.fetchGoogleTask(state.settings.engineer, task.siteId, engineerSession);
-      if (remoteTask?.sessionExpired) {
-        forceLogout("This Engineer login was used on another device. Please login again.");
-        return;
+      const remoteState = await app.fetchHostingerState().catch(() => null);
+      if (remoteState?.tasks) {
+        state.tasks = remoteState.tasks;
+        app.writeState(state);
+        task = getEngineerTasks().find((item) => item.id === taskId) || task;
+      } else {
+        const remoteTask = null;
+        task = mergeRemoteTaskAssets(task, remoteTask);
       }
-      task = mergeRemoteTaskAssets(task, remoteTask);
     }
 
     const isCompleted = task.status === "Completed";
@@ -448,29 +451,14 @@
     app.writeState(state);
     if (!engineerSession?.userId || !engineerSession?.sessionToken) return { skipped: true };
     if (showStatus && statusMessage) app.showSyncStatus(statusMessage, "working", true);
-    const result = await app.postGoogleSync(state, {
-      app: "Bliss TaskPro",
-      source: "engineer",
-      userId: engineerUserId,
-      sessionToken: engineerSession?.sessionToken || "",
-      action,
-      payload,
-      state
-    });
-    if (result?.sessionExpired) {
-      forceLogout("This Engineer login was used on another device. Please login again.");
-      return result;
+    try {
+      await app.saveHostingerState(state);
+      if (showStatus && successMessage) app.showSyncStatus(successMessage, "success");
+      return { ok: true };
+    } catch (error) {
+      if (showStatus) app.showSyncStatus(error?.message || "Sync failed. Data is still cached on this device.", "error");
+      return { error };
     }
-    if (result?.error) {
-      if (showStatus) app.showSyncStatus(result.error.message || "Sync failed. Data is still cached on this device.", "error");
-      return result;
-    }
-    if (result?.skipped) {
-      if (showStatus) app.showSyncStatus(skippedMessage, "idle");
-      return result;
-    }
-    if (showStatus && successMessage) app.showSyncStatus(successMessage, "success");
-    return result;
   }
 
   async function updateTask(taskId, updater, action, options = {}) {
@@ -965,15 +953,11 @@
       engineerSyncButton.textContent = "Syncing...";
     }
     if (!silent) app.showSyncStatus("Fetching latest updates from Hostinger DataSheet...", "working", true);
-    const remoteState = await app.fetchGoogleState(state.settings.engineer, engineerSession);
-    if (remoteState?.sessionExpired) {
-      forceLogout("This Engineer login was used on another device. Please login again.");
-      return;
-    }
-    if (remoteState?.ok && remoteState.state) {
-      applyRemoteState(remoteState.state);
+    const remoteState = await app.fetchHostingerState().catch(() => null);
+    if (remoteState) {
+      applyRemoteState(remoteState);
       if (!silent) app.showSyncStatus("Latest updates synced on this device.", "success");
-    } else if (!silent && !remoteState) {
+    } else if (!silent) {
       app.showSyncStatus("Unable to reach Hostinger storage right now. Cached data is still available.", "error");
     }
     if (engineerSyncButton) {
@@ -983,29 +967,12 @@
   }
 
   async function validateActiveSession(options = {}) {
-    const { silent = true } = options;
-    if (!engineerSession?.userId || !engineerSession?.sessionToken) {
-      if (engineerSession) forceLogout("Session expired. Please login again.");
-      return false;
-    }
-    const result = await app.validateGoogleSession(state.settings.engineer, engineerSession);
-    if (result?.ok) return true;
-    if (result?.sessionExpired) {
-      forceLogout("This Engineer login was used on another device. Please login again.");
-      return false;
-    }
-    if (!silent) {
-      app.showSyncStatus(result?.message || "Unable to validate session right now.", "error");
-    }
-    return true;
+    return !!engineerSession?.userId;
   }
 
   function startCrossDeviceSync() {
     stopCrossDeviceSync();
-    if (!app.resolveGoogleScriptUrl(state.settings.engineer, "engineer") || !engineerSession?.userId || !engineerSession?.sessionToken) return;
-    sessionTimer = setInterval(() => {
-      validateActiveSession({ silent: true });
-    }, 2000);
+    if (!engineerSession?.userId || !engineerSession?.sessionToken) return;
     if (state.settings.engineer.autoSyncEnabled !== false) {
       syncTimer = setInterval(() => {
         syncFromGoogleState({ silent: true });
@@ -1048,10 +1015,6 @@
   }
 
   async function autofillEngineerSettings() {
-    const config = await app.fetchGoogleConfig(state.settings.engineer);
-    if (!config) return;
-    state.settings.engineer = app.mergeGoogleSettings(state.settings.engineer, config);
-    app.persistRoleScriptUrl("engineer", state.settings.engineer.googleScriptUrl);
     app.writeState(state);
   }
 

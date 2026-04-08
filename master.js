@@ -89,29 +89,13 @@
     app.writeState(state);
     if (!masterSession?.userId || !masterSession?.sessionToken) return;
     app.showSyncStatus("Saving data to Hostinger DataSheet...", "working", true);
-    app.postGoogleSync(state, {
-      app: "Bliss TaskPro",
-      source: "master",
-      userId: masterSession?.userId || "",
-      sessionToken: masterSession?.sessionToken || "",
-      action,
-      payload,
-      state
-    }).then((result) => {
-      if (result?.sessionExpired) {
-        forceLogout("This Master login was used on another device. Please login again.");
-        return;
-      }
-      if (result?.error) {
-        app.showSyncStatus(result.error.message || "Sync failed. Data is still cached on this device.", "error");
-        return;
-      }
-      if (result?.skipped) {
-        app.showSyncStatus("Saved locally. Hostinger sync is currently unavailable.", "idle");
-        return;
-      }
-      app.showSyncStatus("Saved to Hostinger DataSheet successfully.", "success");
-    });
+    app.saveHostingerState(state)
+      .then(() => {
+        app.showSyncStatus("Saved to Hostinger DataSheet successfully.", "success");
+      })
+      .catch((error) => {
+        app.showSyncStatus(error?.message || "Sync failed. Data is still cached on this device.", "error");
+      });
   }
 
   function setOptions() {
@@ -672,11 +656,25 @@
       return;
     }
 
-    const remote = await app.fetchGoogleTask(state.settings.master, task.siteId, masterSession);
-    if (remote?.sessionExpired) {
-      forceLogout("This Master login was used on another device. Please login again.");
-      return;
-    }
+    const remoteState = await app.fetchHostingerState().catch(() => null);
+    const remoteTask = (remoteState?.tasks || []).find((item) => item.siteId === task.siteId);
+    const remote = remoteTask ? {
+      latestRow: {
+        "Site Engineer Name": remoteTask.siteEngineerName || "",
+        Status: remoteTask.status || "Pending",
+        "Measurement Text": remoteTask.measurementText || "",
+        "GPS Latitude": remoteTask.gps?.latitude || remoteTask.latitude || "",
+        "GPS Longitude": remoteTask.gps?.longitude || remoteTask.longitude || "",
+        "Documents JSON": JSON.stringify(remoteTask.documents || []),
+        "Photos JSON": JSON.stringify(remoteTask.photos || []),
+        "Measurement Images JSON": JSON.stringify(remoteTask.measurementImages || []),
+        "Rollback Reason": remoteTask.rollbackReason || ""
+      },
+      documents: remoteTask.documents || [],
+      photos: remoteTask.photos || [],
+      measurementImages: remoteTask.measurementImages || [],
+      siteWorkspace: remoteTask.siteWorkspace || null
+    } : null;
     const latestRow = remote?.latestRow || {};
     const latestDocuments = safeJsonParse(latestRow["Documents JSON"]);
     const latestPhotos = safeJsonParse(latestRow["Photos JSON"]);
@@ -975,15 +973,11 @@
       masterSyncButton.textContent = "Syncing...";
     }
     if (!silent) app.showSyncStatus("Fetching latest updates from Hostinger DataSheet...", "working", true);
-    const remoteState = await app.fetchGoogleState(state.settings.master, masterSession);
-    if (remoteState?.sessionExpired) {
-      forceLogout("This Master login was used on another device. Please login again.");
-      return;
-    }
-    if (remoteState?.ok && remoteState.state) {
-      applyRemoteState(remoteState.state);
+    const remoteState = await app.fetchHostingerState().catch(() => null);
+    if (remoteState) {
+      applyRemoteState(remoteState);
       if (!silent) app.showSyncStatus("Latest updates synced on this device.", "success");
-    } else if (!silent && !remoteState) {
+    } else if (!silent) {
       app.showSyncStatus("Unable to reach Hostinger storage right now. Cached data is still available.", "error");
     }
     if (masterSyncButton) {
@@ -993,29 +987,12 @@
   }
 
   async function validateActiveSession(options = {}) {
-    const { silent = true } = options;
-    if (!masterSession?.userId || !masterSession?.sessionToken) {
-      if (masterSession) forceLogout("Session expired. Please login again.");
-      return false;
-    }
-    const result = await app.validateGoogleSession(state.settings.master, masterSession);
-    if (result?.ok) return true;
-    if (result?.sessionExpired) {
-      forceLogout("This Master login was used on another device. Please login again.");
-      return false;
-    }
-    if (!silent) {
-      app.showSyncStatus(result?.message || "Unable to validate session right now.", "error");
-    }
-    return true;
+    return !!masterSession?.userId;
   }
 
   function startCrossDeviceSync() {
     stopCrossDeviceSync();
-    if (!app.resolveGoogleScriptUrl(state.settings.master, "master") || !masterSession?.userId || !masterSession?.sessionToken) return;
-    sessionTimer = setInterval(() => {
-      validateActiveSession({ silent: true });
-    }, 2000);
+    if (!masterSession?.userId || !masterSession?.sessionToken) return;
     if (state.settings.master.autoSyncEnabled !== false) {
       syncTimer = setInterval(() => {
         syncFromGoogleState({ silent: true });
@@ -1143,10 +1120,6 @@
   }
 
   async function autofillMasterSettings() {
-    const config = await app.fetchGoogleConfig(state.settings.master);
-    if (!config) return;
-    state.settings.master = app.mergeGoogleSettings(state.settings.master, config);
-    app.persistRoleScriptUrl("master", state.settings.master.googleScriptUrl);
     app.writeState(state);
   }
 
