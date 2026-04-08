@@ -145,22 +145,22 @@
   }
 
   function clearLocalCache() {
-    const appName = document.body?.dataset?.app === "engineer" ? "engineer" : "master";
-    const state = readState();
-    state.settings = normalizeSettings(state.settings, cloneDefaults().settings);
-    if (appName === "master") {
-      state.settings.master.googleScriptUrl = "";
-      localStorage.removeItem(MASTER_SETTINGS_KEY);
-      localStorage.removeItem(MASTER_SCRIPT_URL_KEY);
-      sessionStorage.removeItem(MASTER_SESSION_KEY);
-    } else {
-      state.settings.engineer.googleScriptUrl = "";
-      localStorage.removeItem(ENGINEER_SETTINGS_KEY);
-      localStorage.removeItem(ENGINEER_SCRIPT_URL_KEY);
-      sessionStorage.removeItem(ENGINEER_SESSION_KEY);
-    }
-    clearSharedLoginContext(appName);
-    writeState(state);
+    const clean = cloneDefaults();
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(MASTER_SETTINGS_KEY);
+    localStorage.removeItem(ENGINEER_SETTINGS_KEY);
+    localStorage.removeItem(MASTER_SCRIPT_URL_KEY);
+    localStorage.removeItem(ENGINEER_SCRIPT_URL_KEY);
+    localStorage.removeItem(SHARED_SCRIPT_URL_KEY);
+    localStorage.removeItem(SHARED_SESSION_TOKEN_KEY);
+    localStorage.removeItem(SHARED_ROLE_KEY);
+    localStorage.removeItem(SHARED_DISPLAY_NAME_KEY);
+    sessionStorage.removeItem(MASTER_SESSION_KEY);
+    sessionStorage.removeItem(ENGINEER_SESSION_KEY);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+    localStorage.setItem(MASTER_SETTINGS_KEY, JSON.stringify(clean.settings.master));
+    localStorage.setItem(ENGINEER_SETTINGS_KEY, JSON.stringify(clean.settings.engineer));
+    return clean;
   }
 
   function getScriptStorageKey(role) {
