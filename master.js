@@ -88,7 +88,7 @@
   function saveState(action, payload) {
     app.writeState(state);
     if (!masterSession?.userId || !masterSession?.sessionToken) return;
-    app.showSyncStatus("Saving data to Google Sheets...", "working", true);
+    app.showSyncStatus("Saving data to Hostinger DataSheet...", "working", true);
     app.postGoogleSync(state, {
       app: "Bliss TaskPro",
       source: "master",
@@ -107,10 +107,10 @@
         return;
       }
       if (result?.skipped) {
-        app.showSyncStatus("Saved locally. Add Apps Script settings to enable cloud sync.", "idle");
+        app.showSyncStatus("Saved locally. Hostinger sync is currently unavailable.", "idle");
         return;
       }
-      app.showSyncStatus("Saved to Google Sheets successfully.", "success");
+      app.showSyncStatus("Saved to Hostinger DataSheet successfully.", "success");
     });
   }
 
@@ -600,9 +600,9 @@
       pdf.save(`${task.siteId}_summary.pdf`);
     }
     if (driveSaveResult?.ok || (!saveDriveCopy && download)) {
-      app.showSyncStatus(saveDriveCopy ? "PDF downloaded and saved in Site ID Reports folder." : "PDF exported successfully.", "success");
+      app.showSyncStatus(saveDriveCopy ? "PDF downloaded and saved in the Hostinger Reports folder." : "PDF exported successfully.", "success");
     } else if (saveDriveCopy && driveSaveResult && !driveSaveResult.ok) {
-      app.showSyncStatus(driveSaveResult.message || "PDF downloaded, but Drive save failed.", "error");
+      app.showSyncStatus(driveSaveResult.message || "PDF downloaded, but Reports save failed.", "error");
     } else {
       app.hideSyncStatus();
     }
@@ -974,7 +974,7 @@
       masterSyncButton.disabled = true;
       masterSyncButton.textContent = "Syncing...";
     }
-    if (!silent) app.showSyncStatus("Fetching latest updates from Google Sheets...", "working", true);
+    if (!silent) app.showSyncStatus("Fetching latest updates from Hostinger DataSheet...", "working", true);
     const remoteState = await app.fetchGoogleState(state.settings.master, masterSession);
     if (remoteState?.sessionExpired) {
       forceLogout("This Master login was used on another device. Please login again.");
@@ -984,7 +984,7 @@
       applyRemoteState(remoteState.state);
       if (!silent) app.showSyncStatus("Latest updates synced on this device.", "success");
     } else if (!silent && !remoteState) {
-      app.showSyncStatus("Unable to reach Google right now. Cached data is still available.", "error");
+      app.showSyncStatus("Unable to reach Hostinger storage right now. Cached data is still available.", "error");
     }
     if (masterSyncButton) {
       masterSyncButton.disabled = false;

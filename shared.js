@@ -11,6 +11,7 @@
   const MASTER_SCRIPT_URL_KEY = "bliss-taskpro-master-script-url";
   const ENGINEER_SCRIPT_URL_KEY = "bliss-taskpro-engineer-script-url";
   const HOSTINGER_UPLOAD_URL = "./upload.php";
+  const HOSTINGER_STORAGE_URL = "./storage.php";
   const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSYkHlxWKM5zrCIei_Wh9zAiDiAh5zq2AG_oBftNBr2VCCrHmb-pxpE5ka2mitSh9_/exec";
   const DEFAULT_LOGIN_API = {
     master: GOOGLE_SCRIPT_URL,
@@ -380,14 +381,17 @@
     const isImage = String(file.type || "").startsWith("image/");
 
     return {
-      id: uid("file"),
+      id: String(payload.fileId || payload.relativePath || uid("file")),
       originalName: file.name,
       storedName,
       name: storedName,
       type: file.type || "application/octet-stream",
+      mimeType: file.type || "application/octet-stream",
       size: file.size || 0,
       uploadedAt,
+      relativePath: String(payload.relativePath || ""),
       fileURL: fileUrl,
+      url: fileUrl,
       downloadURL: fileUrl,
       thumbnailUrl: isImage ? fileUrl : "",
       ...extra
@@ -413,16 +417,58 @@
     return data.map((item) => item.name);
   }
 
-  async function postGoogleSync(state, payload) {
-    const source = payload.source === "engineer" ? "engineer" : "master";
-    const activeSettings = state.settings?.[source] || {};
-    const endpoint = resolveGoogleScriptUrl(activeSettings, source);
-    if (!endpoint) return { skipped: true };
+  async function requestHostingerStorage(payload) {
+    const response = await fetch(HOSTINGER_STORAGE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload || {})
+    });
+    const raw = await response.text();
+    let data = null;
     try {
-      const data = await requestGoogleAppsScript(endpoint, {
+      data = JSON.parse(raw);
+    } catch (error) {
+      const preview = String(raw || "").slice(0, 120).replace(/\s+/g, " ").trim();
+      throw new Error(preview ? `Hostinger storage returned non-JSON response: ${preview}` : "Hostinger storage returned non-JSON response.");
+    }
+    if (!response.ok) {
+      throw new Error(data?.message || data?.error || "Hostinger storage request failed.");
+    }
+    return data;
+  }
+
+  async function requestHostingerStorageGet(query = {}) {
+    const url = new URL(HOSTINGER_STORAGE_URL, window.location.href);
+    Object.entries(query).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      url.searchParams.set(key, String(value));
+    });
+    const response = await fetch(url.toString(), {
+      headers: {
+        Accept: "application/json"
+      }
+    });
+    const raw = await response.text();
+    let data = null;
+    try {
+      data = JSON.parse(raw);
+    } catch (error) {
+      const preview = String(raw || "").slice(0, 120).replace(/\s+/g, " ").trim();
+      throw new Error(preview ? `Hostinger storage returned non-JSON response: ${preview}` : "Hostinger storage returned non-JSON response.");
+    }
+    if (!response.ok) {
+      throw new Error(data?.message || data?.error || "Hostinger storage request failed.");
+    }
+    return data;
+  }
+
+  async function postGoogleSync(state, payload) {
+    try {
+      const data = await requestHostingerStorage({
         ...payload,
-        state: sanitizeStateForStorage(state),
-        activeSettings
+        state: sanitizeStateForStorage(state)
       });
       return data?.ok === false ? { skipped: false, error: new Error(data.message || data.error || "Sync failed"), sessionExpired: !!data.sessionExpired } : { skipped: false, data };
     } catch (error) {
@@ -437,10 +483,8 @@
   }
 
   async function savePdfToDrive(settings, session, payload) {
-    const endpoint = resolveGoogleScriptUrl(settings, session?.role || "master");
-    if (!endpoint) return { ok: false, message: "Apps Script endpoint is not available." };
     try {
-      return await requestGoogleAppsScript(endpoint, {
+      return await requestHostingerStorage({
         action: "savePdfToDrive",
         source: session?.role || "master",
         userId: session?.userId || "",
@@ -448,15 +492,13 @@
         payload
       });
     } catch (error) {
-      return { ok: false, message: error.message || "Unable to save PDF to Drive." };
+      return { ok: false, message: error.message || "Unable to save PDF to Hostinger Reports folder." };
     }
   }
 
   async function deleteDriveFile(settings, session, payload) {
-    const endpoint = resolveGoogleScriptUrl(settings, session?.role || "engineer");
-    if (!endpoint) return { ok: false, message: "Apps Script endpoint is not available." };
     try {
-      return await requestGoogleAppsScript(endpoint, {
+      return await requestHostingerStorage({
         action: "deleteDriveFile",
         source: session?.role || "engineer",
         userId: session?.userId || "",
@@ -464,15 +506,13 @@
         payload
       });
     } catch (error) {
-      return { ok: false, message: error.message || "Unable to delete Drive file." };
+      return { ok: false, message: error.message || "Unable to delete Hostinger file." };
     }
   }
 
   async function saveReportFiles(settings, session, payload) {
-    const endpoint = resolveGoogleScriptUrl(settings, session?.role || "master");
-    if (!endpoint) return { ok: false, message: "Apps Script endpoint is not available." };
     try {
-      return await requestGoogleAppsScript(endpoint, {
+      return await requestHostingerStorage({
         action: "saveReportFiles",
         source: session?.role || "master",
         userId: session?.userId || "",
@@ -480,15 +520,14 @@
         payload
       });
     } catch (error) {
-      return { ok: false, message: error.message || "Unable to save report files." };
+      return { ok: false, message: error.message || "Unable to save report files in Hostinger." };
     }
   }
 
   async function fetchGoogleTask(settings, siteId, session) {
-    const endpoint = resolveGoogleScriptUrl(settings, session?.role || "");
-    if (!endpoint || !siteId) return null;
+    if (!siteId) return null;
     try {
-      return await requestGoogleAppsScriptGet(endpoint, {
+      return await requestHostingerStorageGet({
         action: "getTask",
         siteId,
         source: session?.role || "",
@@ -501,10 +540,8 @@
   }
 
   async function fetchGoogleState(settings, session) {
-    const endpoint = resolveGoogleScriptUrl(settings, session?.role || "");
-    if (!endpoint) return null;
     try {
-      return await requestGoogleAppsScriptGet(endpoint, {
+      return await requestHostingerStorageGet({
         action: "getState",
         source: session?.role || "",
         userId: session?.userId || "",
@@ -639,7 +676,7 @@
   function showSyncStatus(message, tone = "working", persist = false) {
     const host = getStatusHost();
     host.className = `floating-sync-status tone-${tone}`;
-    const normalizedMessage = String(message || "") === "Fetching latest updates from Google Sheets..."
+    const normalizedMessage = String(message || "") === "Fetching latest updates from Hostinger DataSheet..."
       ? "Please Wait, Saving data."
       : message;
     host.querySelector(".floating-sync-status__text").textContent = normalizedMessage;

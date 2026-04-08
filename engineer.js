@@ -440,9 +440,9 @@
 
   async function saveState(action, payload, options = {}) {
     const {
-      statusMessage = "Saving data to Google Sheets...",
-      successMessage = "Saved to Google Sheets successfully.",
-      skippedMessage = "Saved locally. Add Apps Script settings to enable cloud sync.",
+      statusMessage = "Saving data to Hostinger DataSheet...",
+      successMessage = "Saved to Hostinger DataSheet successfully.",
+      skippedMessage = "Saved locally. Hostinger sync is currently unavailable.",
       showStatus = true
     } = options;
     app.writeState(state);
@@ -573,7 +573,7 @@
     const task = state.tasks.find((item) => item.id === taskId && item.engineer === currentEngineer);
     if (!task) return { ok: false, message: "Task not found." };
     const result = await saveState(action, task, {
-      statusMessage: "Saving task update to Google Sheets...",
+      statusMessage: "Saving task update to Hostinger DataSheet...",
       successMessage: "",
       showStatus: false
     });
@@ -852,16 +852,27 @@
     if (isUploadBusy(taskId)) return;
     const task = state.tasks.find((item) => item.id === taskId && item.engineer === currentEngineer);
     if (!task) return;
+    const fileItem = (type === "document" ? task.documents : type === "photo" ? task.photos : task.measurementImages)
+      .find((item) => item.id === fileId);
     updateTask(taskId, (taskItem) => {
       if (type === "document") taskItem.documents = taskItem.documents.filter((item) => item.id !== fileId);
       if (type === "photo") taskItem.photos = taskItem.photos.filter((item) => item.id !== fileId);
       if (type === "measurement") taskItem.measurementImages = taskItem.measurementImages.filter((item) => item.id !== fileId);
     }, "removeFile", {
       saveOptions: {
-        statusMessage: "Updating task in Google Sheets...",
+        statusMessage: "Updating task in Hostinger DataSheet...",
         successMessage: "File removed from task successfully."
       }
-    }).then(() => {
+    }).then(async () => {
+      if (fileItem?.relativePath && engineerSession?.sessionToken) {
+        const deleteResult = await app.deleteDriveFile(state.settings.engineer, engineerSession, {
+          siteId: task.siteId,
+          fileId: fileItem.id
+        });
+        if (deleteResult?.ok === false) {
+          app.showSyncStatus(deleteResult.message || "File was removed from the task, but the Hostinger file could not be deleted.", "error");
+        }
+      }
       renderTaskDetail(taskId);
     });
   }
@@ -953,7 +964,7 @@
       engineerSyncButton.disabled = true;
       engineerSyncButton.textContent = "Syncing...";
     }
-    if (!silent) app.showSyncStatus("Fetching latest updates from Google Sheets...", "working", true);
+    if (!silent) app.showSyncStatus("Fetching latest updates from Hostinger DataSheet...", "working", true);
     const remoteState = await app.fetchGoogleState(state.settings.engineer, engineerSession);
     if (remoteState?.sessionExpired) {
       forceLogout("This Engineer login was used on another device. Please login again.");
@@ -963,7 +974,7 @@
       applyRemoteState(remoteState.state);
       if (!silent) app.showSyncStatus("Latest updates synced on this device.", "success");
     } else if (!silent && !remoteState) {
-      app.showSyncStatus("Unable to reach Google right now. Cached data is still available.", "error");
+      app.showSyncStatus("Unable to reach Hostinger storage right now. Cached data is still available.", "error");
     }
     if (engineerSyncButton) {
       engineerSyncButton.disabled = false;

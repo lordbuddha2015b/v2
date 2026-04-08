@@ -15,9 +15,9 @@ $fileType = strtolower(trim((string)($_POST['fileType'] ?? '')));
 $file = $_FILES['file'] ?? null;
 
 $folderMap = [
-    'photo' => 'photos',
-    'document' => 'documents',
-    'measurement' => 'measurement'
+    'photo' => 'Site Photos',
+    'document' => 'Documents',
+    'measurement' => 'Measurement Photos'
 ];
 
 if ($siteId === '' || !preg_match('/^[A-Z0-9_-]+$/', $siteId)) {
@@ -56,19 +56,18 @@ if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
     exit;
 }
 
-$baseDir = __DIR__ . DIRECTORY_SEPARATOR . 'uploads';
-$targetDir = $baseDir
-    . DIRECTORY_SEPARATOR . $siteId
-    . DIRECTORY_SEPARATOR . $folderMap[$fileType];
-
-if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
+$workspace = null;
+try {
+    $workspace = ensure_site_workspace($siteId);
+} catch (Throwable $error) {
     http_response_code(500);
     echo json_encode([
         'status' => 'error',
-        'message' => 'Unable to create upload directory.'
+        'message' => $error->getMessage() ?: 'Unable to create upload directory.'
     ]);
     exit;
 }
+$targetDir = $workspace[$fileType . 'Dir'];
 
 $originalName = (string)($file['name'] ?? 'upload.bin');
 $extension = pathinfo($originalName, PATHINFO_EXTENSION);
@@ -95,11 +94,53 @@ $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https');
 $scheme = $isHttps ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$relativeUrl = 'uploads/' . rawurlencode($siteId) . '/' . rawurlencode($folderMap[$fileType]) . '/' . rawurlencode($fileName);
-$fileUrl = $scheme . '://' . $host . rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/v2/upload.php'), '/\\') . '/' . $relativeUrl;
+$relativePath = 'uploads/' . $siteId . '/' . $folderMap[$fileType] . '/' . $fileName;
+$relativeUrl = implode('/', array_map('rawurlencode', explode('/', $relativePath)));
+$scriptDir = trim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/upload.php')), '/');
+$baseUrl = $scheme . '://' . $host . ($scriptDir !== '' ? '/' . $scriptDir : '');
+$fileUrl = rtrim($baseUrl, '/') . '/' . $relativeUrl;
 
 echo json_encode([
     'status' => 'success',
     'fileURL' => $fileUrl,
-    'fileName' => $fileName
+    'fileName' => $fileName,
+    'fileId' => $relativePath,
+    'relativePath' => $relativePath
 ]);
+
+function ensure_site_workspace(string $siteId): array
+{
+    $siteDir = __DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $siteId;
+    $documentsDir = $siteDir . DIRECTORY_SEPARATOR . 'Documents';
+    $photosDir = $siteDir . DIRECTORY_SEPARATOR . 'Site Photos';
+    $measurementDir = $siteDir . DIRECTORY_SEPARATOR . 'Measurement Photos';
+    $reportsDir = $siteDir . DIRECTORY_SEPARATOR . 'Reports';
+    $datasheetPath = $siteDir . DIRECTORY_SEPARATOR . $siteId . '_DataSheet.json';
+
+    foreach ([$siteDir, $documentsDir, $photosDir, $measurementDir, $reportsDir] as $dir) {
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException('Unable to create upload directory.');
+        }
+    }
+
+    if (!is_file($datasheetPath)) {
+        file_put_contents($datasheetPath, json_encode([
+            'siteId' => $siteId,
+            'masterEntryHeaders' => ['Site ID', 'Client', 'Engineer', 'Category', 'Activity', 'Date', 'Location', 'District', 'Instructions', 'Created Date'],
+            'engineerEntryHeaders' => ['Site Engineer Name', 'Status', 'Documents JSON', 'Photos JSON', 'Measurement Text', 'Measurement Images JSON', 'Latitude', 'Longitude', 'Completed Date', 'Rollback Reason'],
+            'masterEntry' => [],
+            'engineerEntry' => [],
+            'task' => ['siteId' => $siteId],
+            'updatedAt' => gmdate('c')
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    }
+
+    return [
+        'siteDir' => $siteDir,
+        'documentDir' => $documentsDir,
+        'photoDir' => $photosDir,
+        'measurementDir' => $measurementDir,
+        'reportsDir' => $reportsDir,
+        'datasheetPath' => $datasheetPath
+    ];
+}
