@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $siteId = strtoupper(trim((string)($_POST['siteId'] ?? '')));
 $fileType = strtolower(trim((string)($_POST['fileType'] ?? '')));
+$docType = trim((string)($_POST['docType'] ?? ''));
 $file = $_FILES['file'] ?? null;
 
 $folderMap = [
@@ -77,7 +78,16 @@ $safeBaseName = trim((string)$safeBaseName, '_');
 $safeBaseName = $safeBaseName !== '' ? $safeBaseName : 'file';
 $safeExtension = preg_replace('/[^A-Za-z0-9]+/', '', (string)$extension);
 $uniqueSuffix = date('YmdHis') . '_' . substr(bin2hex(random_bytes(4)), 0, 8);
-$fileName = $safeBaseName . '_' . $uniqueSuffix . ($safeExtension !== '' ? '.' . strtolower($safeExtension) : '');
+$safeDocType = preg_replace('/[^A-Za-z0-9_-]+/', '_', $docType);
+$safeDocType = trim((string)$safeDocType, '_');
+$nameParts = [];
+if ($fileType === 'document' && $safeDocType !== '') {
+    $nameParts[] = $safeDocType;
+}
+$nameParts[] = $siteId;
+$nameParts[] = $safeBaseName;
+$nameParts[] = $uniqueSuffix;
+$fileName = implode('_', array_filter($nameParts)) . ($safeExtension !== '' ? '.' . strtolower($safeExtension) : '');
 $targetPath = $targetDir . DIRECTORY_SEPARATOR . $fileName;
 
 if (!move_uploaded_file($file['tmp_name'], $targetPath)) {

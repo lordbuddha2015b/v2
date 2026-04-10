@@ -573,8 +573,9 @@
     if (share.includeGps && gpsMeta.url) {
       ensureSpace(12);
       const startY = y;
-      pdf.setTextColor(0, 0, 0);
+      pdf.setTextColor(0, 102, 204);
       pdf.textWithLink(`GPS: ${gpsMeta.text}`, 16, y, { url: gpsMeta.url });
+      pdf.setTextColor(0, 0, 0);
       y = startY + 7;
     } else {
       line(`GPS: ${share.includeGps ? gpsMeta.text : "-"}`);
@@ -720,9 +721,8 @@
     const latestPhotos = safeJsonParse(latestRow["Photos JSON"]);
     const latestMeasurementImages = safeJsonParse(latestRow["Measurement Images JSON"]);
     const remoteDocuments = filterLatestRemoteFiles(remote?.documents || [], latestDocuments);
-    const remotePhotoPool = filterLatestRemoteFiles(remote?.photos || [], latestPhotos.concat(latestMeasurementImages));
-    const remotePhotos = filterLatestRemoteFiles(remotePhotoPool, latestPhotos);
-    const remoteMeasurementImages = filterLatestRemoteFiles(remotePhotoPool, latestMeasurementImages);
+    const remotePhotos = filterLatestRemoteFiles(remote?.photos || [], latestPhotos);
+    const remoteMeasurementImages = filterLatestRemoteFiles(remote?.measurementImages || [], latestMeasurementImages);
     const taskView = {
       ...task,
       siteEngineerName: latestRow["Site Engineer Name"] || task.siteEngineerName,

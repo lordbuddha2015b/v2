@@ -983,6 +983,7 @@ function delete_hostinger_file($payload, array $defaultState, array $siteMasterH
 {
     $siteId = normalize_site_id($payload['siteId'] ?? '');
     $fileId = trim((string)($payload['fileId'] ?? ''));
+    $relativePath = trim((string)($payload['relativePath'] ?? ''));
     if ($siteId === '' || $fileId === '') {
         return ['ok' => false, 'message' => 'Site ID and file ID are required.'];
     }
@@ -995,12 +996,16 @@ function delete_hostinger_file($payload, array $defaultState, array $siteMasterH
         $filtered = [];
         foreach ($task[$group] as $item) {
             if (($item['id'] ?? '') === $fileId) {
-                $deletedRelativePath = $item['relativePath'] ?? '';
+                $deletedRelativePath = trim((string)($item['relativePath'] ?? ''));
                 continue;
             }
             $filtered[] = $item;
         }
         $task[$group] = $filtered;
+    }
+
+    if ($deletedRelativePath === '' && $relativePath !== '') {
+        $deletedRelativePath = $relativePath;
     }
 
     if ($deletedRelativePath !== '') {

@@ -333,6 +333,9 @@
     formData.append("file", file);
     formData.append("siteId", siteId);
     formData.append("fileType", fileType);
+    if (extra?.docType) {
+      formData.append("docType", String(extra.docType));
+    }
 
     const response = await fetch(HOSTINGER_UPLOAD_URL, {
       method: "POST",

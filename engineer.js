@@ -855,7 +855,8 @@
       if (fileItem?.relativePath && engineerSession?.sessionToken) {
         const deleteResult = await app.deleteDriveFile(state.settings.engineer, engineerSession, {
           siteId: task.siteId,
-          fileId: fileItem.id
+          fileId: fileItem.id,
+          relativePath: fileItem.relativePath || ""
         });
         if (deleteResult?.ok === false) {
           app.showSyncStatus(deleteResult.message || "File was removed from the task, but the Hostinger file could not be deleted.", "error");
