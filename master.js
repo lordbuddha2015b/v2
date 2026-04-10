@@ -426,7 +426,7 @@
 
     const pageWidth = pdf.internal.pageSize.getWidth();
 
-    const watermarkData = await optimizePdfImage(await toDataUrl("./images/New%20Logo.png"), { maxWidth: 640, format: "image/png" });
+    const watermarkData = await optimizePdfImage(await toDataUrl("./images/New Logo.png"), { maxWidth: 640, format: "image/png" });
 
     function drawWatermark() {
       if (!watermarkData) return;
