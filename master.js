@@ -426,15 +426,15 @@
 
     const pageWidth = pdf.internal.pageSize.getWidth();
 
-    const watermarkData = await optimizePdfImage(await toDataUrl("./images/BlissTaskPro_Logo.png"), { maxWidth: 900, format: "image/png" });
+    const watermarkData = await optimizePdfImage(await toDataUrl("./images/New%20Logo.png"), { maxWidth: 640, format: "image/png" });
 
     function drawWatermark() {
       if (!watermarkData) return;
       try {
         if (typeof pdf.GState === "function" && typeof pdf.setGState === "function") {
-          pdf.setGState(new pdf.GState({ opacity: 0.08 }));
+          pdf.setGState(new pdf.GState({ opacity: 0.05 }));
         }
-        pdf.addImage(watermarkData, "PNG", pageWidth / 2 - 38, 102, 76, 76);
+        pdf.addImage(watermarkData, "PNG", pageWidth / 2 - 42, 98, 84, 84);
         if (typeof pdf.GState === "function" && typeof pdf.setGState === "function") {
           pdf.setGState(new pdf.GState({ opacity: 1 }));
         }

@@ -294,7 +294,10 @@ function normalize_task($task): array
 function merge_app_state(array $storedState, array $incomingState, array $defaultState): array
 {
     $mergedTasks = merge_task_sets($storedState['tasks'] ?? [], $incomingState['tasks'] ?? []);
-    $mergedDrafts = merge_draft_sets($storedState['drafts'] ?? [], $incomingState['drafts'] ?? []);
+    $mergedDrafts = cleanup_stale_drafts(
+        merge_draft_sets($storedState['drafts'] ?? [], $incomingState['drafts'] ?? []),
+        $mergedTasks
+    );
 
     return [
         'options' => [
@@ -364,6 +367,59 @@ function merge_draft_sets(array $storedDrafts, array $incomingDrafts): array
     }
 
     return array_values($draftMap);
+}
+
+function cleanup_stale_drafts(array $drafts, array $tasks): array
+{
+    $taskById = [];
+    $taskByBaseId = [];
+
+    foreach ($tasks as $task) {
+        $normalizedTask = normalize_task($task);
+        $taskId = trim((string)($normalizedTask['id'] ?? ''));
+        $baseTaskId = trim((string)($normalizedTask['baseTaskId'] ?? ''));
+
+        if ($taskId !== '') {
+            $taskById[$taskId] = $normalizedTask;
+        }
+        if ($baseTaskId !== '') {
+            $taskByBaseId[$baseTaskId] = $normalizedTask;
+        }
+    }
+
+    $result = [];
+    foreach ($drafts as $draft) {
+        if (!is_array($draft)) {
+            continue;
+        }
+
+        $sourceTaskId = trim((string)($draft['sourceTaskId'] ?? ''));
+        if ($sourceTaskId === '') {
+            $result[] = $draft;
+            continue;
+        }
+
+        $linkedTask = $taskById[$sourceTaskId] ?? null;
+        if ($linkedTask === null) {
+            $linkedBaseId = extract_task_base_id($sourceTaskId);
+            if ($linkedBaseId !== '' && isset($taskByBaseId[$linkedBaseId])) {
+                $linkedTask = $taskByBaseId[$linkedBaseId];
+            }
+        }
+
+        if ($linkedTask === null) {
+            $result[] = $draft;
+            continue;
+        }
+
+        if (item_updated_at_value($linkedTask) > item_updated_at_value($draft)) {
+            continue;
+        }
+
+        $result[] = $draft;
+    }
+
+    return array_values($result);
 }
 
 function task_merge_key(array $task): string
