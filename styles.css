@@ -805,6 +805,52 @@ tbody td:not(:last-child)::after {
   width: 100%;
 }
 
+.row-action-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.row-action-trigger {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.row-action-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.row-action-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  min-width: 170px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  box-shadow: 0 18px 32px rgba(24, 45, 84, 0.12);
+}
+
+.danger-button {
+  width: 100%;
+  justify-content: center;
+  color: #9f2d47;
+  border-color: rgba(159, 45, 71, 0.22);
+  background: rgba(159, 45, 71, 0.08);
+}
+
 @keyframes floating-sync-progress {
   0% { transform: translateX(-120%); }
   100% { transform: translateX(320%); }

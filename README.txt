@@ -90,6 +90,7 @@ Storage Backend
   - POST action=savePdfToDrive
   - POST action=saveReportFiles
   - POST action=deleteDriveFile
+  - POST action=deleteSiteTask
 
 Conflict Safe Sync
 - storage.php now merges incoming device state with the stored Hostinger state.
@@ -97,6 +98,15 @@ Conflict Safe Sync
 - The newer task version is kept based on updatedAt, completedAt, and createdAt timestamps.
 - This prevents an older Master device copy from overwriting a newer Engineer-completed task.
 - This also helps preserve site engineer name, status, rollback reason, uploaded files, and other newer task fields.
+
+Master Clear All Option
+- The Master Task Details table includes a 3-dots action menu for each task.
+- Clear All Details removes:
+  - the task from Hostinger JSON state
+  - linked editable drafts
+  - the site datasheet JSON
+  - uploaded files
+  - the full uploads/SITEID folder
 
 Important Runtime Note
 - This app needs PHP runtime support.

@@ -92,6 +92,9 @@ try {
     if ($action === 'deleteDriveFile') {
         json_response(delete_hostinger_file($input['payload'] ?? [], $defaultState, $siteMasterHeaders, $siteEngineerHeaders));
     }
+    if ($action === 'deleteSiteTask') {
+        json_response(delete_site_task($input['payload'] ?? [], $defaultState));
+    }
 
     $state = normalize_state($input['state'] ?? [], $defaultState);
     persist_state($state, $defaultState, $siteMasterHeaders, $siteEngineerHeaders);
@@ -1024,6 +1027,94 @@ function delete_hostinger_file($payload, array $defaultState, array $siteMasterH
         'task' => $task,
         'siteWorkspace' => site_workspace_to_object($workspace)
     ];
+}
+
+function delete_site_task($payload, array $defaultState): array
+{
+    $siteId = normalize_site_id($payload['siteId'] ?? '');
+    if ($siteId === '') {
+        return ['ok' => false, 'message' => 'Site ID is required.'];
+    }
+
+    $jsonFile = ensure_json_file();
+    $state = normalize_state(read_json_file($jsonFile, $defaultState), $defaultState);
+
+    $removedTask = null;
+    $remainingTasks = [];
+
+    foreach ($state['tasks'] as $task) {
+        $normalizedTask = normalize_task($task);
+        if (($normalizedTask['siteId'] ?? '') === $siteId) {
+            $removedTask = $normalizedTask;
+            continue;
+        }
+        $remainingTasks[] = $normalizedTask;
+    }
+
+    if ($removedTask === null) {
+        return ['ok' => false, 'message' => 'Task not found for this Site ID.'];
+    }
+
+    $removedTaskId = trim((string)($removedTask['id'] ?? ''));
+    $removedBaseTaskId = trim((string)($removedTask['baseTaskId'] ?? ''));
+    $removedDraftId = trim((string)($removedTask['draftId'] ?? ''));
+
+    $remainingDrafts = [];
+    foreach ($state['drafts'] as $draft) {
+        if (!is_array($draft)) {
+            continue;
+        }
+        $draftId = trim((string)($draft['id'] ?? ''));
+        $sourceTaskId = trim((string)($draft['sourceTaskId'] ?? ''));
+        $sourceBaseTaskId = extract_task_base_id($sourceTaskId);
+
+        if (
+            ($removedDraftId !== '' && $draftId === $removedDraftId) ||
+            ($removedTaskId !== '' && $sourceTaskId === $removedTaskId) ||
+            ($removedBaseTaskId !== '' && $sourceBaseTaskId === $removedBaseTaskId)
+        ) {
+            continue;
+        }
+
+        $remainingDrafts[] = $draft;
+    }
+
+    $state['tasks'] = array_values($remainingTasks);
+    $state['drafts'] = array_values($remainingDrafts);
+    write_json_file($jsonFile, $state);
+
+    $siteDir = uploads_root() . DIRECTORY_SEPARATOR . $siteId;
+    if (is_dir($siteDir)) {
+        remove_directory_recursive($siteDir);
+    }
+
+    return [
+        'ok' => true,
+        'status' => 'success',
+        'siteId' => $siteId,
+        'state' => $state
+    ];
+}
+
+function remove_directory_recursive(string $directory): void
+{
+    if (!is_dir($directory)) {
+        return;
+    }
+
+    foreach (scandir($directory) ?: [] as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        $path = $directory . DIRECTORY_SEPARATOR . $entry;
+        if (is_dir($path)) {
+            remove_directory_recursive($path);
+        } elseif (file_exists($path)) {
+            @unlink($path);
+        }
+    }
+
+    @rmdir($directory);
 }
 
 function sanitize_file_name(string $fileName): string

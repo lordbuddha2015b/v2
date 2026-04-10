@@ -506,6 +506,20 @@
     }
   }
 
+  async function deleteSiteTask(settings, session, payload) {
+    try {
+      return await requestHostingerStorage({
+        action: "deleteSiteTask",
+        source: session?.role || "master",
+        userId: session?.userId || "",
+        sessionToken: session?.sessionToken || "",
+        payload
+      });
+    } catch (error) {
+      return { ok: false, message: error.message || "Unable to clear task data from Hostinger." };
+    }
+  }
+
   async function loginWithGoogle(settings, role, userId, password) {
     const endpoint = sanitizeGoogleValue(DEFAULT_LOGIN_API[role] || DEFAULT_LOGIN_API.master);
     if (!endpoint) {
@@ -692,6 +706,7 @@
     savePdfToDrive,
     deleteDriveFile,
     saveReportFiles,
+    deleteSiteTask,
     reverseGeocodeDistrict,
     loginWithGoogle,
     formatLoginFailure,

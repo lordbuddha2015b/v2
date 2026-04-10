@@ -325,7 +325,7 @@
     const host = document.getElementById("master-task-table");
     const visibleTasks = getVisibleTasks();
     if (!visibleTasks.length) {
-      host.innerHTML = '<tr><td colspan="8"><div class="empty-state">No task data yet.</div></td></tr>';
+      host.innerHTML = '<tr><td colspan="9"><div class="empty-state">No task data yet.</div></td></tr>';
       return;
     }
 
@@ -339,12 +339,52 @@
         <td>${task.documents.filter((item) => item.answer === "Yes").length}</td>
         <td>${task.photos.length}</td>
         <td><button class="secondary-button status-action-button ${app.statusClass(task.status)}" data-open-task="${task.id}">${task.status}</button></td>
+        <td>
+          <details class="row-action-menu">
+            <summary class="row-action-trigger" aria-label="Task actions">⋮</summary>
+            <div class="row-action-panel">
+              <button class="mini-button danger-button" type="button" data-clear-site="${task.id}">Clear All Details</button>
+            </div>
+          </details>
+        </td>
       </tr>
     `).join("");
 
     host.querySelectorAll("[data-open-task]").forEach((button) => {
       button.addEventListener("click", () => openTaskDetailModal(button.dataset.openTask));
     });
+    host.querySelectorAll("[data-clear-site]").forEach((button) => {
+      button.addEventListener("click", () => clearTaskData(button.dataset.clearSite));
+    });
+  }
+
+  async function clearTaskData(taskId) {
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task?.siteId) {
+      window.alert("Task or Site ID not found.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Clear all data for Site ID ${task.siteId}?\n\nThis will remove:\n- task entry\n- linked editable drafts\n- uploaded files\n- site datasheet\n- Hostinger site folder`
+    );
+    if (!confirmed) return;
+
+    app.showSyncStatus("Clearing task data from Hostinger...", "working", true);
+    const result = await app.deleteSiteTask(state.settings.master, masterSession, {
+      siteId: task.siteId
+    });
+
+    if (!result?.ok) {
+      app.showSyncStatus(result?.message || "Unable to clear task data from Hostinger.", "error");
+      return;
+    }
+
+    state = result.state || state;
+    app.writeState(state);
+    refreshAll();
+    closeTaskDetailModal();
+    app.showSyncStatus("Task data cleared from Hostinger successfully.", "success");
   }
 
   function collectSharePackage(taskId) {
