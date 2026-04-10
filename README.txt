@@ -91,6 +91,13 @@ Storage Backend
   - POST action=saveReportFiles
   - POST action=deleteDriveFile
 
+Conflict Safe Sync
+- storage.php now merges incoming device state with the stored Hostinger state.
+- Tasks are merged by Site ID or task base identity.
+- The newer task version is kept based on updatedAt, completedAt, and createdAt timestamps.
+- This prevents an older Master device copy from overwriting a newer Engineer-completed task.
+- This also helps preserve site engineer name, status, rollback reason, uploaded files, and other newer task fields.
+
 Important Runtime Note
 - This app needs PHP runtime support.
 - If the app is opened from a static host or from a local file path, storage.php and upload.php will not run.

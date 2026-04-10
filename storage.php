@@ -63,20 +63,24 @@ try {
             json_response(get_task_snapshot($input, $siteMasterHeaders, $siteEngineerHeaders));
         }
         if ($action === 'getState' || $action === '') {
-            $jsonFile = ensure_json_file();
-            echo file_get_contents($jsonFile);
-            exit;
+            json_response(get_latest_app_state($defaultState));
         }
         json_response(['ok' => false, 'status' => 'error', 'message' => 'Unsupported action.'], 400);
     }
 
     if ($action === 'syncState') {
         $jsonFile = ensure_json_file();
-        $state = normalize_state($input['state'] ?? [], $defaultState);
-        file_put_contents($jsonFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-        persist_state($state, $defaultState, $siteMasterHeaders, $siteEngineerHeaders);
-        echo json_encode(['status' => 'success'], JSON_UNESCAPED_SLASHES);
-        exit;
+        $incomingState = normalize_state($input['state'] ?? [], $defaultState);
+        $storedState = normalize_state(read_json_file($jsonFile, $defaultState), $defaultState);
+        $mergedState = merge_app_state($storedState, $incomingState, $defaultState);
+        file_put_contents($jsonFile, json_encode($mergedState, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        persist_state($mergedState, $defaultState, $siteMasterHeaders, $siteEngineerHeaders);
+        json_response([
+            'ok' => true,
+            'status' => 'success',
+            'state' => $mergedState,
+            'stateUpdatedAt' => gmdate('c')
+        ]);
     }
 
     if ($action === 'savePdfToDrive') {
@@ -285,6 +289,125 @@ function normalize_task($task): array
         'updatedAt' => trim((string)($data['updatedAt'] ?? '')),
         'siteWorkspace' => is_array($data['siteWorkspace'] ?? null) ? $data['siteWorkspace'] : null
     ];
+}
+
+function merge_app_state(array $storedState, array $incomingState, array $defaultState): array
+{
+    $mergedTasks = merge_task_sets($storedState['tasks'] ?? [], $incomingState['tasks'] ?? []);
+    $mergedDrafts = merge_draft_sets($storedState['drafts'] ?? [], $incomingState['drafts'] ?? []);
+
+    return [
+        'options' => [
+            'clients' => merge_option_list($defaultState['options']['clients'] ?? [], array_merge($storedState['options']['clients'] ?? [], $incomingState['options']['clients'] ?? [])),
+            'engineers' => merge_option_list($defaultState['options']['engineers'] ?? [], array_merge($storedState['options']['engineers'] ?? [], $incomingState['options']['engineers'] ?? [])),
+            'categories' => merge_option_list($defaultState['options']['categories'] ?? [], array_merge($storedState['options']['categories'] ?? [], $incomingState['options']['categories'] ?? [])),
+            'activities' => merge_option_list($defaultState['options']['activities'] ?? [], array_merge($storedState['options']['activities'] ?? [], $incomingState['options']['activities'] ?? [])),
+            'districts' => merge_option_list($defaultState['options']['districts'] ?? [], array_merge($storedState['options']['districts'] ?? [], $incomingState['options']['districts'] ?? []))
+        ],
+        'settings' => [
+            'master' => normalize_settings_app($incomingState['settings']['master'] ?? $storedState['settings']['master'] ?? [], $defaultState['settings']['master']),
+            'engineer' => normalize_settings_app($incomingState['settings']['engineer'] ?? $storedState['settings']['engineer'] ?? [], $defaultState['settings']['engineer'])
+        ],
+        'drafts' => $mergedDrafts,
+        'tasks' => $mergedTasks
+    ];
+}
+
+function merge_task_sets(array $storedTasks, array $incomingTasks): array
+{
+    $taskMap = [];
+
+    foreach ($storedTasks as $task) {
+        $normalized = normalize_task($task);
+        $taskMap[task_merge_key($normalized)] = $normalized;
+    }
+
+    foreach ($incomingTasks as $task) {
+        $normalized = normalize_task($task);
+        $key = task_merge_key($normalized);
+        $existing = $taskMap[$key] ?? null;
+        if ($existing === null || task_updated_at_value($normalized) >= task_updated_at_value($existing)) {
+            $taskMap[$key] = $normalized;
+        }
+    }
+
+    return array_values($taskMap);
+}
+
+function merge_draft_sets(array $storedDrafts, array $incomingDrafts): array
+{
+    $draftMap = [];
+
+    foreach ($storedDrafts as $draft) {
+        if (!is_array($draft)) {
+            continue;
+        }
+        $id = trim((string)($draft['id'] ?? ''));
+        if ($id === '') {
+            continue;
+        }
+        $draftMap[$id] = $draft;
+    }
+
+    foreach ($incomingDrafts as $draft) {
+        if (!is_array($draft)) {
+            continue;
+        }
+        $id = trim((string)($draft['id'] ?? ''));
+        if ($id === '') {
+            continue;
+        }
+        $existing = $draftMap[$id] ?? null;
+        if ($existing === null || item_updated_at_value($draft) >= item_updated_at_value($existing)) {
+            $draftMap[$id] = $draft;
+        }
+    }
+
+    return array_values($draftMap);
+}
+
+function task_merge_key(array $task): string
+{
+    $siteId = trim((string)($task['siteId'] ?? ''));
+    if ($siteId !== '') {
+        return 'site:' . $siteId;
+    }
+
+    $baseTaskId = trim((string)($task['baseTaskId'] ?? ''));
+    if ($baseTaskId !== '') {
+        return 'base:' . $baseTaskId;
+    }
+
+    return 'id:' . trim((string)($task['id'] ?? uniqid('task', true)));
+}
+
+function task_updated_at_value(array $task): int
+{
+    return item_updated_at_value([
+        'updatedAt' => $task['updatedAt'] ?? '',
+        'completedAt' => $task['completedAt'] ?? '',
+        'createdAt' => $task['createdAt'] ?? ''
+    ]);
+}
+
+function item_updated_at_value($item): int
+{
+    if (!is_array($item)) {
+        return 0;
+    }
+
+    foreach (['updatedAt', 'completedAt', 'createdAt'] as $field) {
+        $value = trim((string)($item[$field] ?? ''));
+        if ($value === '') {
+            continue;
+        }
+        $timestamp = strtotime($value);
+        if ($timestamp !== false) {
+            return (int)$timestamp;
+        }
+    }
+
+    return 0;
 }
 
 function normalize_file_list($items): array
