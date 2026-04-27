@@ -7,7 +7,7 @@
   --panel-strong: #fff;
   --text: #16416a;
   --muted: #5f7f9f;
-  --border: rgba(178, 205, 156, 0.28);
+  --border: rgba(76, 124, 56, 0.58);
   --success: #c3f7d0;
   --warning: #ffd8a8;
   --pending: #e5e5e5;
@@ -441,7 +441,7 @@ thead th {
 
 tbody td {
   padding: 14px;
-  border-top: 1px solid rgba(75, 67, 118, 0.08);
+  border-top: 1px solid rgba(76, 124, 56, 0.34);
   vertical-align: top;
   position: relative;
 }
@@ -454,7 +454,40 @@ tbody td:not(:last-child)::after {
   right: 0;
   width: 1px;
   height: 80%;
-  background: linear-gradient(180deg, rgba(160, 160, 160, 0), rgba(160, 160, 160, 0.45), rgba(160, 160, 160, 0));
+  background: linear-gradient(180deg, rgba(76, 124, 56, 0), rgba(76, 124, 56, 0.92), rgba(76, 124, 56, 0));
+}
+
+.native-upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.upload-picker-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.upload-picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.upload-picker-summary {
+  min-height: 46px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .stats-strip {

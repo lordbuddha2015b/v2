@@ -389,6 +389,8 @@
 
   function collectSharePackage(taskId) {
     const task = state.tasks.find((item) => item.id === taskId);
+    const billingStatus = document.getElementById("shareBillingStatus")?.value || "No";
+    const billingEnabled = billingStatus === "Yes";
     return {
       selectedDocuments: task.documents.filter((item) => item.answer === "Yes" && document.querySelector(`[data-doc-id="${item.id}"]`)?.checked).map((item) => item.id),
       selectedPhotos: task.photos.filter((item) => document.querySelector(`[data-photo-id="${item.id}"]`)?.checked).map((item) => item.id),
@@ -399,9 +401,9 @@
       includeGps: document.getElementById("includeGps")?.checked ?? true,
       includeRollbackReason: document.getElementById("includeRollbackReason")?.checked ?? true,
       workOrder: document.getElementById("shareWorkOrder")?.value.trim() || "",
-      billingStatus: document.getElementById("shareBillingStatus")?.value || "No",
-      invoiceNumber: document.getElementById("shareInvoiceNumber")?.value.trim() || "",
-      value: document.getElementById("shareValue")?.value || ""
+      billingStatus,
+      invoiceNumber: billingEnabled ? (document.getElementById("shareInvoiceNumber")?.value.trim() || "") : "",
+      value: billingEnabled ? (document.getElementById("shareValue")?.value || "") : ""
     };
   }
 
@@ -590,8 +592,10 @@
     pdf.setFont(undefined, "normal");
     line(`WO: ${share.workOrder || "-"}`, 112);
     line(`Billing Status: ${share.billingStatus}`, 112);
-    line(`Invoice No: ${share.invoiceNumber || "-"}`, 112);
-    line(`Value: ${share.value || "-"}`, 112);
+    if (share.billingStatus === "Yes") {
+      line(`Invoice No: ${share.invoiceNumber || "-"}`, 112);
+      line(`Value: ${share.value || "-"}`, 112);
+    }
     y = Math.max(afterTaskInfoY, y) + 2;
     if (share.includeInstructions) {
       sectionTitle("Instructions");
@@ -760,6 +764,8 @@
     };
     const gpsMeta = buildGpsMeta(taskView);
 
+    const billingEnabled = share.billingStatus === "Yes";
+
     host.innerHTML = `
       <div class="detail-panel">
         <div class="task-hero">
@@ -841,9 +847,9 @@
 
         <div class="form-grid">
           <label><span>WO</span><input id="shareWorkOrder" type="text" value="${app.escapeHtml(share.workOrder)}"></label>
-          <label><span>Billing Status</span><select id="shareBillingStatus"><option value="Yes" ${share.billingStatus === "Yes" ? "selected" : ""}>Yes</option><option value="No" ${share.billingStatus === "No" ? "selected" : ""}>No</option></select></label>
-          <label><span>Invoice Number</span><input id="shareInvoiceNumber" type="text" value="${app.escapeHtml(share.invoiceNumber)}"></label>
-          <label><span>Value</span><input id="shareValue" type="number" step="0.01" value="${app.escapeHtml(share.value)}"></label>
+          <label><span>Billing Status</span><select id="shareBillingStatus"><option value="No" ${share.billingStatus === "No" ? "selected" : ""}>No</option><option value="Yes" ${share.billingStatus === "Yes" ? "selected" : ""}>Yes</option></select></label>
+          ${billingEnabled ? `<label><span>Invoice Number</span><input id="shareInvoiceNumber" type="text" value="${app.escapeHtml(share.invoiceNumber)}"></label>` : ""}
+          ${billingEnabled ? `<label><span>Value</span><input id="shareValue" type="number" step="0.01" value="${app.escapeHtml(share.value)}"></label>` : ""}
         </div>
 
         ${taskView.status === "Completed" ? `
@@ -914,6 +920,12 @@
         download: true,
         saveDriveCopy: true
       });
+    });
+
+    document.getElementById("shareBillingStatus")?.addEventListener("change", () => {
+      task.sharePackage = collectSharePackage(task.id);
+      saveState("updateShareBillingStatus", { taskId: task.id, sharePackage: task.sharePackage });
+      openTaskDetailModal(task.id);
     });
 
     if (taskView.status === "Completed") {
@@ -1318,10 +1330,10 @@
     closeMap();
   });
   masterSyncButton?.addEventListener("click", syncFromGoogleState);
-  document.getElementById("master-login-settings").addEventListener("click", openSettings);
-  document.getElementById("master-clear-cache").addEventListener("click", clearCacheAndReset);
-  document.getElementById("close-settings-modal").addEventListener("click", closeSettings);
-  document.getElementById("save-google-settings").addEventListener("click", () => {
+  document.getElementById("master-login-settings")?.addEventListener("click", openSettings);
+  document.getElementById("master-clear-cache")?.addEventListener("click", clearCacheAndReset);
+  document.getElementById("close-settings-modal")?.addEventListener("click", closeSettings);
+  document.getElementById("save-google-settings")?.addEventListener("click", () => {
     closeSettings();
   });
   document.getElementById("close-task-detail-modal").addEventListener("click", closeTaskDetailModal);

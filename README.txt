@@ -21,6 +21,7 @@ Current Architecture
 - Tasks, drafts, sync, and report persistence use Hostinger storage.
 - File uploads use Hostinger uploads folder.
 - Browser local storage is used as device cache and fallback.
+- Login-page settings buttons have been removed because login and script configuration are now automatic.
 
 Login Flow
 1. User opens index.html or engineer.html.
@@ -44,6 +45,7 @@ Engineer App Flow
 4. Documents, photos, and measurement images are uploaded through upload.php.
 5. Task data is saved back through storage.php.
 6. File remove action updates task state and also attempts physical file deletion from Hostinger.
+7. Mobile upload UI now uses explicit picker actions for camera, gallery/image, and file selection where relevant instead of relying only on the native browser file chooser row.
 
 Hostinger State Storage
 - Main JSON state file:

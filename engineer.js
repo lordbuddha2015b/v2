@@ -295,6 +295,78 @@
       || /\.(png|jpe?g|gif|bmp|webp|svg)$/.test(fileName);
   }
 
+  function uploadPickerMarkup(config) {
+    const {
+      group,
+      title,
+      disabled = false,
+      showCamera = true,
+      showGallery = true,
+      showFiles = false,
+      galleryAccept = "image/*",
+      fileAccept = "*/*",
+      allowMultipleGallery = false,
+      allowMultipleFiles = false
+    } = config;
+
+    return `
+      <div class="upload-picker-shell">
+        ${showCamera ? `<input class="native-upload-input" id="${group}CameraInput" type="file" accept="image/*" capture="environment" ${disabled ? "disabled" : ""}>` : ""}
+        ${showGallery ? `<input class="native-upload-input" id="${group}GalleryInput" type="file" accept="${galleryAccept}" ${allowMultipleGallery ? "multiple" : ""} ${disabled ? "disabled" : ""}>` : ""}
+        ${showFiles ? `<input class="native-upload-input" id="${group}FilesInput" type="file" accept="${fileAccept}" ${allowMultipleFiles ? "multiple" : ""} ${disabled ? "disabled" : ""}>` : ""}
+        <div class="upload-picker-actions">
+          ${showCamera ? `<button class="secondary-button" type="button" data-open-upload-picker="${group}CameraInput" ${disabled ? "disabled" : ""}>Open Camera</button>` : ""}
+          ${showGallery ? `<button class="secondary-button" type="button" data-open-upload-picker="${group}GalleryInput" ${disabled ? "disabled" : ""}>Select Image</button>` : ""}
+          ${showFiles ? `<button class="secondary-button" type="button" data-open-upload-picker="${group}FilesInput" ${disabled ? "disabled" : ""}>Choose File</button>` : ""}
+        </div>
+        <div id="${group}PickerSummary" class="upload-picker-summary">${app.escapeHtml(title)}</div>
+      </div>
+    `;
+  }
+
+  function collectPickerFiles(group) {
+    const fileIds = [`${group}CameraInput`, `${group}GalleryInput`, `${group}FilesInput`];
+    return fileIds.flatMap((id) => Array.from(document.getElementById(id)?.files || []));
+  }
+
+  function clearPickerFiles(group) {
+    [`${group}CameraInput`, `${group}GalleryInput`, `${group}FilesInput`].forEach((id) => {
+      const input = document.getElementById(id);
+      if (input) input.value = "";
+    });
+    updatePickerSummary(group);
+  }
+
+  function updatePickerSummary(group) {
+    const summary = document.getElementById(`${group}PickerSummary`);
+    if (!summary) return;
+    const files = collectPickerFiles(group);
+    summary.textContent = files.length
+      ? files.map((file) => file.name).join(", ")
+      : group === "document"
+        ? "No document selected."
+        : group === "photo"
+          ? "No site photos selected."
+          : "No measurement image selected.";
+  }
+
+  function bindUploadPickerButtons(host) {
+    host.querySelectorAll("[data-open-upload-picker]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const input = document.getElementById(button.dataset.openUploadPicker);
+        input?.click();
+      });
+    });
+
+    ["document", "photo", "measurement"].forEach((group) => {
+      [`${group}CameraInput`, `${group}GalleryInput`, `${group}FilesInput`].forEach((id) => {
+        const input = document.getElementById(id);
+        input?.addEventListener("change", () => updatePickerSummary(group));
+      });
+      updatePickerSummary(group);
+    });
+  }
+
   async function renderTaskDetail(taskId, documentAnswerOverride, options = {}) {
     const { skipRemote = false } = options;
     let task = getEngineerTasks().find((item) => item.id === taskId);
@@ -380,7 +452,21 @@
                   <option value="Electrical Inspectrate">Electrical Inspectrate</option>
                 </select>
               </label>
-              <label class="full-span" id="document-upload-wrap"><span>Upload Document</span><input id="documentUpload" type="file"></label>
+              <div class="full-span" id="document-upload-wrap">
+                <span>Upload Document</span>
+                ${uploadPickerMarkup({
+                  group: "document",
+                  title: "Use camera for scan image, or choose image/file from gallery, folder, or drive.",
+                  disabled: disableActions,
+                  showCamera: true,
+                  showGallery: true,
+                  showFiles: true,
+                  galleryAccept: "image/*",
+                  fileAccept: "image/*,.pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf",
+                  allowMultipleGallery: true,
+                  allowMultipleFiles: true
+                })}
+              </div>
             ` : ""}
           </div>
           <div class="action-row">
@@ -394,7 +480,19 @@
         <section class="update-box">
           <h5>Site Photos</h5>
           <div class="doc-config-row">
-            <label><span>Select Photos</span><input id="photoUpload" type="file" accept="image/*" multiple ${!canEdit || disableActions ? "disabled" : ""}></label>
+            <div class="full-span">
+              <span>Select Photos</span>
+              ${uploadPickerMarkup({
+                group: "photo",
+                title: "Choose camera or select photos from gallery, folder, or drive.",
+                disabled: !canEdit || disableActions,
+                showCamera: true,
+                showGallery: true,
+                showFiles: false,
+                galleryAccept: "image/*",
+                allowMultipleGallery: true
+              })}
+            </div>
           </div>
           <div class="action-row">
             ${canEdit && !isCompleted ? `<button id="add-photos" class="secondary-button" type="button">Save Photos</button>` : ''}
@@ -408,7 +506,19 @@
           <h5>Measurement</h5>
           <div class="form-grid">
             <label class="full-span"><span>Measurement Text</span><textarea id="measurementText" ${disableActions ? "disabled" : ""}>${app.escapeHtml(task.measurementText || "")}</textarea></label>
-            <label><span>Measurement Image</span><input id="measurementUpload" type="file" accept="image/*" multiple ${!canEdit || disableActions ? "disabled" : ""}></label>
+            <div class="full-span">
+              <span>Measurement Image</span>
+              ${uploadPickerMarkup({
+                group: "measurement",
+                title: "Choose camera or select measurement image from gallery, folder, or drive.",
+                disabled: !canEdit || disableActions,
+                showCamera: true,
+                showGallery: true,
+                showFiles: false,
+                galleryAccept: "image/*",
+                allowMultipleGallery: true
+              })}
+            </div>
           </div>
           <div class="action-row">
             ${canEdit && !isCompleted ? `<button id="save-measurement" class="secondary-button" type="button">Save Measurement</button>` : ''}
@@ -437,6 +547,7 @@
       host.querySelectorAll("[data-remove]").forEach((button) => {
         button.addEventListener("click", () => removeFile(task.id, button.dataset.remove, button.dataset.fileId));
       });
+      bindUploadPickerButtons(host);
     }
     document.getElementById("mark-wip")?.addEventListener("click", () => markWip(task.id));
   }
@@ -672,14 +783,13 @@
       return;
     }
 
-    const fileInput = document.getElementById("documentUpload");
     const type = document.getElementById("documentType").value;
-    if (!fileInput.files.length) {
+    const rawFiles = collectPickerFiles("document");
+    if (!rawFiles.length) {
       window.alert("Please upload a document file.");
       return;
     }
     const task = state.tasks.find((item) => item.id === taskId && item.engineer === currentEngineer);
-    const rawFiles = Array.from(fileInput.files || []);
     const uploadItems = rawFiles.map((rawFile) => ({
       file: rawFile,
       extra: {
@@ -691,7 +801,7 @@
       taskItem.documents = taskItem.documents.filter((item) => item.answer !== "No");
       taskItem.documents = taskItem.documents.concat(file);
     });
-    fileInput.value = "";
+    clearPickerFiles("document");
   }
 
   function getCurrentCoords() {
@@ -779,7 +889,7 @@
 
   async function addPhotos(taskId) {
     if (isUploadBusy(taskId)) return;
-    const files = Array.from(document.getElementById("photoUpload").files || []);
+    const files = collectPickerFiles("photo");
     if (!files.length) {
       window.alert("Please choose photo files.");
       return;
@@ -796,13 +906,13 @@
     await uploadItemsSequentially(taskId, "photo", uploadItems, (taskItem, file) => {
       taskItem.photos = taskItem.photos.concat(file);
     });
-    document.getElementById("photoUpload").value = "";
+    clearPickerFiles("photo");
   }
 
   async function saveMeasurement(taskId) {
     if (isUploadBusy(taskId)) return;
     const measurementText = document.getElementById("measurementText").value.trim();
-    const measurementFiles = document.getElementById("measurementUpload").files;
+    const measurementFiles = collectPickerFiles("measurement");
     if (!measurementText && !measurementFiles.length) {
       window.alert("Please enter measurement text or choose measurement image.");
       return;
@@ -833,7 +943,7 @@
         }, "saveMeasurement");
       }
     }
-    document.getElementById("measurementUpload").value = "";
+    clearPickerFiles("measurement");
   }
 
   function removeFile(taskId, type, fileId) {
@@ -1089,10 +1199,10 @@
   document.getElementById("close-engineer-map-modal").addEventListener("click", closeMap);
   document.getElementById("save-engineer-map-point").addEventListener("click", applyMapGps);
   engineerSyncButton?.addEventListener("click", syncFromGoogleState);
-  document.getElementById("engineer-login-settings").addEventListener("click", openSettings);
-  document.getElementById("engineer-clear-cache").addEventListener("click", clearCacheAndReset);
-  document.getElementById("close-engineer-settings-modal").addEventListener("click", closeSettings);
-  document.getElementById("engineer-save-google-settings").addEventListener("click", () => {
+  document.getElementById("engineer-login-settings")?.addEventListener("click", openSettings);
+  document.getElementById("engineer-clear-cache")?.addEventListener("click", clearCacheAndReset);
+  document.getElementById("close-engineer-settings-modal")?.addEventListener("click", closeSettings);
+  document.getElementById("engineer-save-google-settings")?.addEventListener("click", () => {
     closeSettings();
   });
 
